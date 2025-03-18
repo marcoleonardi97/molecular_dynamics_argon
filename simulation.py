@@ -168,39 +168,6 @@ class Simulation():
         velocities -= np.mean(velocities, axis=0)
         
         return velocities
-
-    def old(self):
-        def _equilibrate_velocities(self, num_steps=10):
-            """
-            Equilibrate velocities to target temperature through repeated rescaling.
-            
-            Parameters:
-            -----------
-            num_steps (int): Number of rescaling steps
-            """
-            for _ in range(num_steps):
-                # Calculate current kinetic energy
-                current_kinetic_energy = 0.5 * np.sum(np.sum(self.velocities ** 2, axis=1))
-                
-                # Calculate target kinetic energy using equipartition theorem
-                # Using (N-1) degrees of freedom due to conservation of momentum
-                target_kinetic_energy = (self.num_atoms - 1) * 1.5 * self.temperature
-                
-                # Calculate scaling factor
-                lambda_factor = np.sqrt(target_kinetic_energy / current_kinetic_energy)
-                
-                # Rescale velocities
-                self.velocities *= lambda_factor
-
-        def get_current_temperature(self):
-            # Calculate kinetic energy
-            kinetic_energy = 0
-            for atom in self.atoms:
-                kinetic_energy += 0.5 * np.sum(atom.velocity**2)
-
-            # Temperature = (2/3) * kinetic energy / (number of atoms)
-            temperature = (2/3) * kinetic_energy / self.num_atoms
-            return temperature
         
     def _equilibrate_velocities(self, num_steps=10):
         """
