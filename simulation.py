@@ -77,7 +77,7 @@ class Atom(object):
             print('end position is:', self.position + self.change_pos)
 
 class Simulation():
-    def __init__(self, density, temperature, num_atoms=108, element="argon", boxsize=None):
+    def __init__(self, density=1.2, temperature=0.5, num_atoms=108, element="argon", boxsize=None):
         """
         density (float): Density in reduced units
         temperature (float): Temperature in reduced units
