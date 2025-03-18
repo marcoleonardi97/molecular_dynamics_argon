@@ -20,7 +20,6 @@ class Atom(object):
         
         self.temperature = temperature
         self.element = element
-        #self.change_temp = (3 * self.temperature) ** 0.5  # Scaling factor for temperature
 
         if position is not None:
             self.position = position
@@ -29,7 +28,6 @@ class Atom(object):
         if velocity is not None:
             self.velocity = velocity
         else:
-            # Initialize with Maxwell-Boltzmann distribution, this is probably redundant now
             self.velocity = np.random.normal(0, (self.temperature) ** 0.5, size=3) # * self.change_temp
 
         self.mass = 1  # Mass in reduced units
@@ -106,13 +104,11 @@ class Simulation():
         # Initialize positions on FCC lattice
         self.positions = self._initialize_fcc_lattice(self.density)
         self.velocities = self._initialize_velocities()
-        
-        # Equilibrate velocities to target 
-        
-        
         self.atoms = [Atom(element=element, temperature=temperature, 
                           position=self.positions[i], 
                           velocity=self.velocities[i]) for i in range(num_atoms)]
+        
+        # Equilibrate velocities to target 
         self._equilibrate_velocities(num_steps=10)
     
     def _initialize_fcc_lattice(self, density):
@@ -199,78 +195,7 @@ class Simulation():
             actual_temp = self.get_current_temperature()
             if abs(actual_temp - self.temperature) / self.temperature < 0.01:
                 break
-
-    def get_current_temperature(self):
-        """
-        Calculate the current temperature from the kinetic energy.
-        
-        Returns:
-        --------
-        float: Current temperature in reduced units
-        """
-        # Calculate kinetic energy
-        kinetic_energy = 0.0
-        for atom in self.atoms:
-            kinetic_energy += 0.5 * np.sum(atom.velocity**2)
-        
-        # Temperature = 2/3 * kinetic energy / N
-        # Adjusting for 3 conserved momentum degrees of freedom
-        temperature = 2 * kinetic_energy / (3 * self.num_atoms - 3)
-        
-        return temperature
-
-    def verify_temperature_scaling(self):
-        """
-        Verify that temperature scaling is working correctly.
-        
-        Returns:
-        --------
-        tuple: (target_temperatures, actual_temperatures)
-        """
-        # Store original temperature
-        original_temp = self.temperature
-        
-        # Test a range of temperatures
-        target_temps = np.linspace(0.2, 2.0, 5)
-        actual_temps = []
-        
-        for temp in target_temps:
-            self.temperature = temp
-            self._equilibrate_velocities(num_steps=20)
-            actual_temps.append(self.get_current_temperature())
-            
-        # Plot results
-        plt.figure(figsize=(8, 6))
-        plt.plot(target_temps, target_temps, 'k--', label='Perfect scaling')
-        plt.plot(target_temps, actual_temps, 'ro-', label='Actual temperatures')
-        plt.xlabel('Target Temperature (ε/k)')
-        plt.ylabel('Actual Temperature (ε/k)')
-        plt.title('Temperature Scaling Verification')
-        plt.legend()
-        plt.grid(True)
-        
-        os.makedirs("plots", exist_ok=True)
-        plt.savefig("plots/temperature_scaling.png")
-        plt.show()
-        
-        # Restore original temperature
-        self.temperature = original_temp
-        self._equilibrate_velocities()
-        
-        return target_temps, actual_temps
-
-    def add_atom(self, atom):
-        """
-        Add an atom manually to the simulation. It must have a specified position and velocity.
-        
-        Parameters:
-        -----------
-        atom (Atom): Atom object to add
-        """
-        self.num_atoms += 1
-        self.atoms.append(atom)
-        self.positions = np.array([a.position for a in self.atoms])
-
+                
     def _update_positions(self):
         """
         Update positions and velocities of all atoms and recalculate energies.
@@ -328,6 +253,79 @@ class Simulation():
         
         return relative_fluctuation < tolerance
 
+    def get_current_temperature(self):
+        """
+        Calculate the current temperature from the kinetic energy.
+        
+        Returns:
+        --------
+        float: Current temperature in reduced units
+        """
+        # Calculate kinetic energy
+        kinetic_energy = 0.0
+        for atom in self.atoms:
+            kinetic_energy += 0.5 * np.sum(atom.velocity**2)
+        
+        # Temperature = 2/3 * kinetic energy / N
+        # Adjusting for 3 conserved momentum degrees of freedom
+        temperature = 2 * kinetic_energy / (3 * self.num_atoms - 3)
+        
+        return temperature
+
+    def verify_temperature_scaling(self):
+        """
+        Verify that temperature scaling is working correctly.
+        Only used for debugging.
+        
+        Returns:
+        --------
+        tuple: (target_temperatures, actual_temperatures)
+        """
+        # Store original temperature
+        original_temp = self.temperature
+        
+        # Test a range of temperatures
+        target_temps = np.linspace(0.2, 2.0, 5)
+        actual_temps = []
+        
+        for temp in target_temps:
+            self.temperature = temp
+            self._equilibrate_velocities(num_steps=20)
+            actual_temps.append(self.get_current_temperature())
+            
+        # Plot results
+        plt.figure(figsize=(8, 6))
+        plt.plot(target_temps, target_temps, 'k--', label='Perfect scaling')
+        plt.plot(target_temps, actual_temps, 'ro-', label='Actual temperatures')
+        plt.xlabel('Target Temperature (ε/k)')
+        plt.ylabel('Actual Temperature (ε/k)')
+        plt.title('Temperature Scaling Verification')
+        plt.legend()
+        plt.grid(True)
+        
+        os.makedirs("plots", exist_ok=True)
+        plt.savefig("plots/temperature_scaling.png")
+        plt.show()
+        
+        # Restore original temperature
+        self.temperature = original_temp
+        self._equilibrate_velocities()
+        
+        return target_temps, actual_temps
+
+    def add_atom(self, atom):
+        """
+        Add an atom manually to the simulation. It must have a specified position and velocity.
+        
+        Parameters:
+        -----------
+        atom (Atom): Atom object to add.
+        """
+        self.num_atoms += 1
+        self.atoms.append(atom)
+        self.positions = np.array([a.position for a in self.atoms])
+
+
     def evolve_system(self, dt, t_end, change_phase = "",
                       plot=False, plot3d=False, plot_energy=False, verbose=False):
         """
@@ -361,10 +359,6 @@ class Simulation():
             potential_energy = 0
             
             for atom in self.atoms:
-                # Update temperature if needed , i think we dont need this anymore
-                #if change_phase is not "":
-                    #atom.temperature += temperature_gradient 
-                
                 # Reset changes for this step
                 atom.change_vel = np.zeros(3)
                 atom.change_pos = np.zeros(3)
@@ -376,6 +370,7 @@ class Simulation():
                         potential_energy += atom.pot_energy / 2  # Divide by 2 to avoid double counting
 
             self._equilibrate_velocities()
+            
             # Update simulation temperature if needed
             if change_phase != "":
                 self.temperature += temperature_gradient 
@@ -384,7 +379,6 @@ class Simulation():
             # Update positions and energies
             self._update_positions()
             
-            # Advance time
             self.time += dt
             self.frame += 1
             steps += 1
@@ -425,7 +419,7 @@ class Simulation():
         pressure_samples = np.zeros(n_samples)
         
         # Collect pressure samples over several time steps
-        for i in range(n_samples):
+        for _ in range(n_samples):
             # Kinetic contribution from ideal gas law: P_kin = ρkT
             kinetic_contribution = self.num_atoms * self.get_current_temperature() / (2 * self.box_size)**3
             
@@ -477,7 +471,7 @@ class Simulation():
         """
         return self.compute_pressure()
 
-    def plot_phase_diagram(self, temperatures, densities, n_samples=5):
+    def get_phase_diagram(self, temperatures, densities, n_samples=5):
         """
         Generate a phase diagram by calculating pressure at different temperatures and densities.
         
@@ -535,7 +529,7 @@ class Simulation():
         densities = np.linspace(0.1, 1.0, 5)     # Adjust for better resolution
         
         # Calculate pressure at each point
-        P, T, rho, P_err = self.plot_phase_diagram(temperatures, densities)
+        P, T, rho, P_err = self.get_phase_diagram(temperatures, densities)
         
         # Create 3D plot
         fig = plt.figure(figsize=(10, 8))
