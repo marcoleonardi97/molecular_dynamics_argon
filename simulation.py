@@ -471,6 +471,113 @@ class Simulation():
         """
         return self.compute_pressure()
 
+    def plot_energy(self, dt, time_tot):
+        """
+        Plot energy evolution over time.
+        
+        Parameters:
+        -----------
+        dt (float): Timestep used in simulation
+        time_tot (float): Total simulation time
+        """
+        pot_en = self.potential_energy
+        kin_en = self.kinetic_energy
+        tot_en = self.total_energy
+        temps = self.temperature_history
+        
+        time = np.linspace(0, time_tot, len(tot_en))
+
+        # Create figure with subplots
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 12))
+        
+        # Energy plot
+        ax1.plot(time, pot_en, label='Potential energy')
+        ax1.plot(time, kin_en, label='Kinetic energy')
+        ax1.plot(time, tot_en, label='Total energy')
+        ax1.set_xlabel('Time')
+        ax1.set_ylabel('Energy')
+        ax1.set_title('Energy Evolution')
+        ax1.legend()
+        
+        # Temperature plot
+        ax2.plot(time, temps, label='Temperature', color='red')
+        ax2.axhline(y=self.temperature, color='black', linestyle='--', label='Target temperature')
+        ax2.set_xlabel('Time')
+        ax2.set_ylabel('Temperature')
+        ax2.set_title('Temperature Evolution')
+        ax2.legend()
+        
+        # Add system information
+        plt.figtext(0.7, 0.5, f"Target T = {self.temperature:.2f}")
+        plt.figtext(0.7, 0.48, f"Final T = {temps[-1]:.2f}")
+        plt.figtext(0.7, 0.46, f"N atoms = {self.num_atoms}")
+        plt.figtext(0.7, 0.44, f"Box size = {self.box_size:.2f} σ")
+        
+        plt.tight_layout()
+        os.makedirs("plots", exist_ok=True)
+        plt.savefig("plots/energy_temperature.png")
+        plt.show()
+        
+    def calculate_radial_distribution(self, bins=50, n_evals = 10):
+        """
+        Calculate the radial distribution function (RDF).
+        
+        Parameters:
+        -----------
+        bins (int): Number of distance bins for the histogram
+        
+        Returns:
+        --------
+        tuple: (r, g(r)) arrays for the RDF
+        """
+        L = 2 * self.box_size
+        dr = L / (2 * bins)
+        r_max = L / 2
+        
+        # Create distance bins
+        r_bins = np.linspace(0, r_max, bins)
+        hist = np.zeros(bins)
+        
+        # Calculate all pairwise distances
+        for i in range(self.num_atoms):
+            for j in range(i+1, self.num_atoms):
+                r_ij = self.atoms[i].position - self.atoms[j].position
+                
+                # Apply minimum image convention
+                for dim in range(3):
+                    if abs(r_ij[dim]) > L/2:
+                        r_ij[dim] = abs(r_ij[dim]) - L
+                
+                r = np.linalg.norm(r_ij)
+                if r < r_max:
+                    bin_idx = int(r / dr)
+                    if bin_idx < bins:
+                        hist[bin_idx] += 2  # Count each pair twice
+        
+        # Calculate g(r)
+        density = self.num_atoms / (L**3)
+        vol_factor = 4 * np.pi * r_bins**2 * dr
+        g_r = hist / (self.num_atoms * density * vol_factor)
+        
+        return r_bins, g_r
+    
+    def plot_radial_distribution(self):
+        """
+        Plot the radial distribution function.
+        """
+        r, g_r = self.calculate_radial_distribution()
+        
+        plt.figure()
+        plt.plot(r, g_r)
+        plt.xlabel('r (σ)')
+        plt.ylabel('g(r)')
+        plt.title('Radial Distribution Function')
+        plt.grid(True)
+        
+        os.makedirs("plots", exist_ok=True)
+        plt.savefig("plots/rdf.png")
+        plt.show()
+
     def get_phase_diagram(self, temperatures, densities, n_samples=5):
         """
         Generate a phase diagram by calculating pressure at different temperatures and densities.
@@ -597,15 +704,6 @@ class Simulation():
         os.makedirs("plots", exist_ok=True)
         plt.savefig("plots/pressure_vs_density.png")
         plt.show()
-        
-        # Note: A more accurate identification of the triple point would require
-        # calculating the Gibbs free energy and finding where three phases coexist
-        # This is beyond the scope of this implementation.
-        print("Note: To precisely identify the triple point, a more detailed analysis")
-        print("of the Gibbs free energy is required. This would involve calculating")
-        print("the chemical potential and finding where three phases coexist.")
-
-
 
     def plot_system(self, save=False, show=False):
         """
@@ -703,114 +801,6 @@ class Simulation():
             os.remove(frame)
         
         print(f"Animation saved as {name}.gif")
-
-    def plot_energy(self, dt, time_tot):
-        """
-        Plot energy evolution over time.
-        
-        Parameters:
-        -----------
-        dt (float): Timestep used in simulation
-        time_tot (float): Total simulation time
-        """
-        pot_en = self.potential_energy
-        kin_en = self.kinetic_energy
-        tot_en = self.total_energy
-        temps = self.temperature_history
-        
-        time = np.linspace(0, time_tot, len(tot_en))
-
-        # Create figure with subplots
-        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 12))
-        
-        # Energy plot
-        ax1.plot(time, pot_en, label='Potential energy')
-        ax1.plot(time, kin_en, label='Kinetic energy')
-        ax1.plot(time, tot_en, label='Total energy')
-        ax1.set_xlabel('Time')
-        ax1.set_ylabel('Energy')
-        ax1.set_title('Energy Evolution')
-        ax1.legend()
-        
-        # Temperature plot
-        ax2.plot(time, temps, label='Temperature', color='red')
-        ax2.axhline(y=self.temperature, color='black', linestyle='--', label='Target temperature')
-        ax2.set_xlabel('Time')
-        ax2.set_ylabel('Temperature')
-        ax2.set_title('Temperature Evolution')
-        ax2.legend()
-        
-        # Add system information
-        plt.figtext(0.7, 0.5, f"Target T = {self.temperature:.2f}")
-        plt.figtext(0.7, 0.48, f"Final T = {temps[-1]:.2f}")
-        plt.figtext(0.7, 0.46, f"N atoms = {self.num_atoms}")
-        plt.figtext(0.7, 0.44, f"Box size = {self.box_size:.2f} σ")
-        
-        plt.tight_layout()
-        os.makedirs("plots", exist_ok=True)
-        plt.savefig("plots/energy_temperature.png")
-        plt.show()
-        
-    def calculate_radial_distribution(self, bins=50, n_evals = 10):
-        """
-        Calculate the radial distribution function (RDF).
-        
-        Parameters:
-        -----------
-        bins (int): Number of distance bins for the histogram
-        
-        Returns:
-        --------
-        tuple: (r, g(r)) arrays for the RDF
-        """
-        L = 2 * self.box_size
-        dr = L / (2 * bins)
-        r_max = L / 2
-        
-        # Create distance bins
-        r_bins = np.linspace(0, r_max, bins)
-        hist = np.zeros(bins)
-        
-        # Calculate all pairwise distances
-        for i in range(self.num_atoms):
-            for j in range(i+1, self.num_atoms):
-                r_ij = self.atoms[i].position - self.atoms[j].position
-                
-                # Apply minimum image convention
-                for dim in range(3):
-                    if abs(r_ij[dim]) > L/2:
-                        r_ij[dim] = abs(r_ij[dim]) - L
-                
-                r = np.linalg.norm(r_ij)
-                if r < r_max:
-                    bin_idx = int(r / dr)
-                    if bin_idx < bins:
-                        hist[bin_idx] += 2  # Count each pair twice
-        
-        # Calculate g(r)
-        density = self.num_atoms / (L**3)
-        vol_factor = 4 * np.pi * r_bins**2 * dr
-        g_r = hist / (self.num_atoms * density * vol_factor)
-        
-        return r_bins, g_r
-    
-    def plot_radial_distribution(self):
-        """
-        Plot the radial distribution function.
-        """
-        r, g_r = self.calculate_radial_distribution()
-        
-        plt.figure()
-        plt.plot(r, g_r)
-        plt.xlabel('r (σ)')
-        plt.ylabel('g(r)')
-        plt.title('Radial Distribution Function')
-        plt.grid(True)
-        
-        os.makedirs("plots", exist_ok=True)
-        plt.savefig("plots/rdf.png")
-        plt.show()
-
         
     def __str__(self):
         """
@@ -826,11 +816,3 @@ class Simulation():
                 f"Equilibrated: {self.is_equilibrated() if len(self.total_energy) > 10 else 'Not enough data'}")
 
 
-# future: 
-# 0) i think temperatures are not correctly made dimensionless right now
-# 1) probably want to change the temperature gradient parameter in the evolution function to evolve from solid to liquid
-# liquid to gas and so on. 
-# 2) need to check that velocities are correctly being scaled to the temperature (i dont think they are)
-# 3) need to implement pressure reading (also get the mean of like 10 loops)
-# 4) check if densities are being applied correctly ( i think they are)
-# 5) run calculate radial distribution function multiple times for realistic results
