@@ -1,3 +1,5 @@
+from simulation import Simulation, Atom
+
 def main():
     print("Starting molecular dynamics simulation...")
     
