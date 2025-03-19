@@ -355,6 +355,105 @@ class Simulation():
         
         return relative_fluctuation < tolerance
 
+    def evolve_system_v2(self, dt, t_end, heat_up_to=0,
+                      plot=False, plot3d=False, plot_energy=False, verbose=False):
+        """
+        Evolve the simulation over time using Velocity Verlet algorithm.
+        """
+        temperature_gradient = (heat_up_to - self.temperature) / (t_end/dt) if heat_up_to > 0 else 0
+        steps = 0
+        
+        while self.time < t_end:
+            # Step 1: Update positions using current velocities and forces
+            for atom in self.atoms:
+                # r(t+dt) = r(t) + v(t)*dt + 0.5*F(t)*dt^2/m
+                atom.position += atom.velocity * dt + 0.5 * atom.change_vel * dt**2
+                
+                # Apply periodic boundary conditions
+                for i in range(3):
+                    if atom.position[i] > self.box_size:
+                        atom.position[i] -= 2 * self.box_size
+                    elif atom.position[i] < -self.box_size:
+                        atom.position[i] += 2 * self.box_size
+            
+            # Save the current forces for half-step velocity update
+            old_forces = np.array([atom.change_vel.copy() for atom in self.atoms])
+            
+            # Reset forces
+            for atom in self.atoms:
+                atom.change_vel = np.zeros(3)
+                atom.change_pos = np.zeros(3)
+                atom.pot_energy = 0
+            
+            # Step 2: Calculate new forces
+            for i in range(self.num_atoms):
+                for j in range(i+1, self.num_atoms):  # Only calculate each pair once
+                    r_ij = self.atoms[i].position - self.atoms[j].position
+                    
+                    # Apply minimum image convention
+                    for dim in range(3):
+                        if r_ij[dim] > self.box_size:
+                            r_ij[dim] -= 2 * self.box_size
+                        elif r_ij[dim] < -self.box_size:
+                            r_ij[dim] += 2 * self.box_size
+                    
+                    r = np.linalg.norm(r_ij)
+                    
+                    if r < 0.01:
+                        continue
+                    
+                    # Calculate LJ force
+                    r_inv = 1.0 / r
+                    r_inv6 = r_inv**6
+                    r_inv12 = r_inv6**2
+                    
+                    force_magnitude = 24 * (2 * r_inv12 - r_inv6) * r_inv
+                    force_vec = force_magnitude * r_ij / r
+                    
+                    # Apply force to both atoms (Newton's third law)
+                    self.atoms[i].change_vel += force_vec
+                    self.atoms[j].change_vel -= force_vec  # Opposite force
+                    
+                    # Calculate potential energy
+                    pot_energy = 4 * (r_inv12 - r_inv6)
+                    self.atoms[i].pot_energy += pot_energy/2
+                    self.atoms[j].pot_energy += pot_energy/2
+            
+            # Step 3: Update velocities using old and new forces
+            for i, atom in enumerate(self.atoms):
+                # v(t+dt) = v(t) + 0.5*[F(t) + F(t+dt)]*dt/m
+                atom.velocity += 0.5 * (old_forces[i] + atom.change_vel) * dt
+            
+            # Apply temperature scaling if needed
+            if temperature_gradient > 0:
+                self.temperature += temperature_gradient * dt
+                self._equilibrate_velocities()
+            
+            # Update system properties
+            self._update_positions()
+            
+            # Advance time
+            self.time += dt
+            self.frame += 1
+            steps += 1
+            
+            if steps % 10 == 0:
+                print(f"System evolved to {self.time:.3f} s, Kin. Temperature: {self.get_current_temperature():.2e}")
+                if self.is_equilibrated():
+                    print("System is equilibrated.")
+            
+            # Save plots if requested
+            if plot:
+                self.plot_system(save=True)
+            if plot3d:
+                self.plot_system_3d(save=True)
+        
+        # Plot energy evolution if requested
+        if plot_energy:
+            self.plot_energy(dt, t_end)
+    
+        print("Simulation completed.")
+
     def evolve_system(self, dt, t_end, heat_up_to = 0,
                       plot=False, plot3d=False, plot_energy=False, verbose=False):
         """
