@@ -187,6 +187,54 @@ class Simulation():
         velocities -= np.mean(velocities, axis=0)
         
         return velocities
+
+    def initialize_for_phase(self, phase="liquid"):
+        """
+        Initialize the system for a specific phase.
+        
+        Parameters:
+        -----------
+        phase (str): One of "gas", "liquid", or "solid"
+        """
+        if phase == "gas":
+            self.temperature = 3.0
+            self.density = 0.3
+            self.box_size = (self.num_atoms / self.density) ** (1/3)
+            
+            # For gas, use random positions
+            self.positions = np.random.uniform(-self.box_size, self.box_size, (self.num_atoms, 3))
+            self.velocities = self._initialize_velocities()
+            
+        elif phase == "solid":
+            self.temperature = 0.5
+            self.density = 1.2
+            self.box_size = (self.num_atoms / self.density) ** (1/3)
+            
+            # For solid, use FCC lattice
+            self.positions = self._initialize_fcc_lattice(self.density)
+            self.velocities = self._initialize_velocities()
+            
+        elif phase == "liquid":
+            self.temperature = 1.0
+            self.density = 0.8
+            self.box_size = (self.num_atoms / self.density) ** (1/3)
+            
+            # For liquid, use FCC lattice with small random displacement
+            base_positions = self._initialize_fcc_lattice(self.density)
+            displacement = np.random.normal(0, 0.1, (self.num_atoms, 3))
+            self.positions = base_positions + displacement
+            self.velocities = self._initialize_velocities()
+            
+        else:
+            raise ValueError("Phase must be one of 'gas', 'liquid', or 'solid'")
+        
+        # Initialize atoms
+        self.atoms = [Atom(element=self.element, temperature=self.temperature, 
+                         position=self.positions[i], 
+                         velocity=self.velocities[i]) for i in range(self.num_atoms)]
+        
+        # Equilibrate velocities
+        self._equilibrate_velocities()
         
     def _equilibrate_velocities(self, num_steps=30):
         """
