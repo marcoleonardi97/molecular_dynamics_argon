@@ -253,7 +253,7 @@ class Simulation():
             # Calculate target kinetic energy using equipartition theorem
             # For N particles in 3D: E_kin = 3N/2 * kT
             # Subtracting 3 degrees of freedom for conserved momentum
-            target_kinetic_energy = (3 * self.num_atoms - 3) * self.temperature
+            target_kinetic_energy = (3 * (self.num_atoms - 3)) * self.temperature
             
             # Calculate scaling factor
             lambda_factor = np.sqrt(target_kinetic_energy / current_kinetic_energy)
