@@ -272,47 +272,6 @@ class Simulation():
         
         return temperature
 
-    def verify_temperature_scaling(self):
-        """
-        Verify that temperature scaling is working correctly.
-        Only used for debugging.
-        
-        Returns:
-        --------
-        tuple: (target_temperatures, actual_temperatures)
-        """
-        # Store original temperature
-        original_temp = self.temperature
-        
-        # Test a range of temperatures
-        target_temps = np.linspace(0.2, 2.0, 5)
-        actual_temps = []
-        
-        for temp in target_temps:
-            self.temperature = temp
-            self._equilibrate_velocities(num_steps=20)
-            actual_temps.append(self.get_current_temperature())
-            
-        # Plot results
-        plt.figure(figsize=(8, 6))
-        plt.plot(target_temps, target_temps, 'k--', label='Perfect scaling')
-        plt.plot(target_temps, actual_temps, 'ro-', label='Actual temperatures')
-        plt.xlabel('Target Temperature (ε/k)')
-        plt.ylabel('Actual Temperature (ε/k)')
-        plt.title('Temperature Scaling Verification')
-        plt.legend()
-        plt.grid(True)
-        
-        os.makedirs("plots", exist_ok=True)
-        plt.savefig("plots/temperature_scaling.png")
-        plt.show()
-        
-        # Restore original temperature
-        self.temperature = original_temp
-        self._equilibrate_velocities()
-        
-        return target_temps, actual_temps
-
     def add_atom(self, atom):
         """
         Add an atom manually to the simulation. It must have a specified position and velocity.
